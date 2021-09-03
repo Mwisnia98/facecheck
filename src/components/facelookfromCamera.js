@@ -10,6 +10,7 @@ import { tinyFaceDetector } from 'face-api.js';
 const FacelookFromCamera = () => {
 
     const [video,setVideo] = useState(null);
+    const [mediast,mediastrimset] = useState(null);
 
 
     const loadModels = async () => {
@@ -17,69 +18,54 @@ const FacelookFromCamera = () => {
         await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
         await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
-        this.mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }})
-        setVideo(this.mediaStream);
+
+        
+        const vd = document.getElementById("video")
+        let strtVideo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }})
+        .then(stream => { 
+          vd.srcObject = stream;
+            vd.play()
+            
+            const cnv = document.getElementById("canvas")
+            cnv.height = vd.height;
+            cnv.width = vd.width;
+            const displaySize = {width:vd.width,height:vd.height}
+            console.log(displaySize)
+            vd.addEventListener('play',() => {
+              setInterval(async () => {
+                
+                let faces = await faceapi.detectAllFaces(vd, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
+                const resizedDetections = faceapi.resizeResults(faces, displaySize);
+                cnv.getContext("2d").clearRect(0,0,cnv.width,cnv.height)
+                faceapi.draw.drawDetections(cnv,resizedDetections)
+              },1000)
+          })
+        },error => console.error(error))
     }
     
-
-
-    const loadImage = async () => {
-
-        
-        if (
-            video.current.paused ||
-            video.current.ended
-          ) {
-            setTimeout(() => loadImage());
-            return;
-          }
-        
-
-        
-        let faces = await faceapi.detectAllFaces(video.current, new tinyFaceDetector()).withFaceLandmarks().withFaceDescriptors();
-        //console.log(faces)
-        const displaySize = { width: 512, height: 512 }
-        faces = faceapi.resizeResults(faces,displaySize)
-
-          const canvas = document.createElement('canvas'); 
-          const context = canvas.getContext('2d');
-
-            canvas.height = 512;
-            canvas.width = 512;
-            context.drawImage(
-            video.current,
-            0,
-            0,
-            canvas.width,
-            canvas.height
-            );
-
-            document.getElementById('overlay').appendChild(canvas);
-            faceapi.draw.drawDetections(canvas, faces)
-            setTimeout(() => loadImage(), 1000)
-    }
 
     useEffect(() => {
         loadModels()
     },[]);
 
     return (
-        <div>
+        <div id="vdandCanv">
          <video
-            ref={video}
+            id="video"
             autoPlay
             muted
-            onPlay={loadImage}
+            width="500"
+            height="300"
             style={{
-              position: "absolute",
-              width: "100%",
-              height: "100vh",
+
+              position: "relative",
               left: 0,
               right: 0,
               bottom: 0,
               top: 0
             }}
           />
+          <canvas id="canvas"></canvas>
       </div>
     )
 }
